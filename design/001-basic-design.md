@@ -33,7 +33,7 @@ There are a lot of open source distribution id generate solutions, but I didn't 
 - **client/sdk**: send id request to the worker
 
 
-### API Design
+### ID Types
 
 The id builder should provide api to generate id of the following types:
 - **Auto increment number id**
@@ -45,7 +45,7 @@ The id builder should provide api to generate id of the following types:
   - the format `<type> + <YYYYMMDD> + '-' + <sequence>` will generate id like `P20230101-1234`, `B20230102-3456`.
 
 
-#### auto increment number id
+### Auto Increment Number Id
 
 Parameters to config a increment number id builder:
 - **base**: number which to start from, it will increase when generating new.
@@ -88,7 +88,7 @@ Response example:
 ```
 
 
-#### snowflake style number id
+### Snowflake Style Number Id
 
 Parameters to config a snowflake style number id builder:
 - **skip_size**: the bit size to skip at the first beginning.
@@ -145,7 +145,7 @@ The client/sdk will generate id using the config:
 ```
 
 
-#### fix format string id
+### Fix Format String Id
 
 Parameters to config a snowflake style number id builder:
 - **parts**: one or multiple `part_config`, the id value is that combines all part values by order.
