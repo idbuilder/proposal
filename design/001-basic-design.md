@@ -136,7 +136,8 @@ All successful responses follow this structure:
 
 | Category       | ID Type     | Endpoint                  | Method | Auth Token  | Description                              |
 |----------------|-------------|---------------------------|--------|-------------|------------------------------------------|
-| Authentication | -           | `/v1/auth/token`          | GET    | Admin Token | Get key token for ID generation          |
+| Authentication | -           | `/v1/auth/token`          | GET    | Admin Token | Get or create key token (auto-creates if not exists) |
+|                | -           | `/v1/auth/tokenreset`     | GET    | Admin Token | Reset (regenerate) key token             |
 | Configuration  | Increment   | `/v1/config/increment`    | POST   | Admin Token | Create/Update increment ID config        |
 |                |             | `/v1/config/increment`    | GET    | Admin Token | Get increment ID config                  |
 |                | Snowflake   | `/v1/config/snowflake`    | POST   | Admin Token | Create/Update snowflake ID config        |
@@ -151,9 +152,13 @@ All successful responses follow this structure:
 
 ### 0. Authentication API
 
-Retrieve a key token for accessing ID generation APIs. This endpoint requires admin token authentication.
+Manage key tokens for accessing ID generation APIs. These endpoints require admin token authentication.
 
-#### Get Key Token
+**Token Format:** Key tokens are 64-character URL-safe base64 strings (e.g., `A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v2W3x4Y5z6A7b8C9d0E1f2`).
+
+#### Get or Create Key Token
+
+Retrieve a key token for the specified key. If no valid token exists for the key, a new one is automatically created.
 
 ```
 GET /v1/auth/token
@@ -177,7 +182,8 @@ curl -X GET "http://idbuilder/v1/auth/token?key=order-id" \
 | Parameter    | Type   | Description                                         |
 |--------------|--------|-----------------------------------------------------|
 | `key`        | string | The requested key identifier                        |
-| `token`      | string | Key token for ID generation API authentication      |
+| `token`      | string | Key token for ID generation API authentication (64 chars) |
+| `token_type` | string | Token type (always "key")                           |
 | `expires_at` | string | Token expiration time (ISO 8601 format)             |
 
 **Response Example:**
@@ -188,8 +194,54 @@ curl -X GET "http://idbuilder/v1/auth/token?key=order-id" \
   "message": "success",
   "data": {
     "key": "order-id",
-    "token": "tok_a1b2c3d4e5f6",
+    "token": "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v2W3x4Y5z6A7b8C9d0E1f2",
+    "token_type": "key",
     "expires_at": "2024-01-11T10:00:00Z"
+  }
+}
+```
+
+#### Reset Key Token
+
+Regenerate a new token for the specified key, invalidating any existing token for that key.
+
+```
+GET /v1/auth/tokenreset
+```
+
+**Request Parameters:**
+
+| Parameter | Type   | Required | Description                                |
+|-----------|--------|----------|--------------------------------------------|
+| `key`     | string | Yes      | Identifier for the ID configuration        |
+
+**Request Example:**
+
+```bash
+curl -X GET "http://idbuilder/v1/auth/tokenreset?key=order-id" \
+  -H "Authorization: Bearer <admin_token>"
+```
+
+**Response Parameters:**
+
+| Parameter    | Type   | Description                                         |
+|--------------|--------|-----------------------------------------------------|
+| `key`        | string | The requested key identifier                        |
+| `token`      | string | New key token for ID generation API authentication (64 chars) |
+| `token_type` | string | Token type (always "key")                           |
+| `expires_at` | string | Token expiration time (ISO 8601 format)             |
+
+**Response Example:**
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "key": "order-id",
+    "token": "X9y8Z7a6B5c4D3e2F1g0H9i8J7k6L5m4N3o2P1q0R9s8T7u6V5w4X3y2Z1a0B9c8",
+    "token_type": "key",
+    "expires_at": "2024-02-10T10:00:00Z"
   }
 }
 ```
