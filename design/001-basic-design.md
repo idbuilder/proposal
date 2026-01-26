@@ -119,6 +119,21 @@ Existing distributed ID generation solutions typically focus on a single ID type
 |---------------|---------------------------------------|---------------------------------------------|
 | Admin Token   | `Authorization: Bearer <admin_token>` | Configuration APIs (`/v1/config/*`), Token API (`/v1/auth/token`) |
 | Key Token     | `Authorization: Bearer <key_token>`   | ID Generation APIs (`/v1/id/*`)             |
+| Global Token  | `Authorization: Bearer <global_token>`| ID Generation APIs (`/v1/id/*`) for any key with `key_token_enable: false` |
+
+**Global Token:**
+
+A special global key token can be created using `key=__global__` with the `/v1/auth/token` or `/v1/auth/tokenreset` endpoints. The global token can authenticate against any config that has `key_token_enable: false` (the default). This allows applications to use a single token for multiple keys instead of managing separate tokens per key.
+
+**Reserved Key Names:**
+
+Key names that start or end with double underscores (`__`) are reserved for system use. User-defined configurations cannot use these names. Currently reserved: `__global__`.
+
+**Per-Key Token Requirement:**
+
+Each configuration type supports a `key_token_enable` field (default: `false`):
+- `false`: Accepts both global token and per-key token authentication
+- `true`: Requires per-key token authentication (global token is rejected)
 
 ### Common Response Format
 
@@ -173,7 +188,12 @@ GET /v1/auth/token
 **Request Example:**
 
 ```bash
+# Get or create a per-key token
 curl -X GET "http://idbuilder/v1/auth/token?key=order-id" \
+  -H "Authorization: Bearer <admin_token>"
+
+# Get or create the global token (can access any key with key_token_enable: false)
+curl -X GET "http://idbuilder/v1/auth/token?key=__global__" \
   -H "Authorization: Bearer <admin_token>"
 ```
 
@@ -264,12 +284,13 @@ POST /v1/config/increment
 
 | Parameter           | Type    | Required | Default | Description                                                |
 |---------------------|---------|----------|---------|------------------------------------------------------------|
-| `key`               | string  | Yes      | -       | Unique identifier for this configuration                   |
+| `key`               | string  | Yes      | -       | Unique identifier for this configuration (cannot start/end with `__`) |
 | `name`              | string  | No       | -       | Human-readable name for the configuration                  |
 | `base`              | integer | Yes      | -       | Starting number for the sequence                           |
 | `delta`             | integer | No       | 1       | Default increment between consecutive IDs                  |
 | `max_request_delta` | integer | No       | 100     | Maximum allowed delta per request (prevents abuse)         |
 | `rand_delta`        | boolean | No       | false   | Enable randomized delta within the specified range         |
+| `key_token_enable`  | boolean | No       | false   | If true, requires per-key token (rejects global token)     |
 
 **Request Example:**
 
@@ -283,7 +304,8 @@ curl -X POST "http://idbuilder/v1/config/increment" \
     "base": 1000,
     "delta": 1,
     "max_request_delta": 100,
-    "rand_delta": false
+    "rand_delta": false,
+    "key_token_enable": false
   }'
 ```
 
@@ -329,6 +351,7 @@ curl -X GET "http://idbuilder/v1/config/increment?key=order-id" \
     "delta": 1,
     "max_request_delta": 100,
     "rand_delta": false,
+    "key_token_enable": false,
     "created_at": "2023-01-11T10:00:00Z",
     "updated_at": "2023-01-11T15:30:00Z"
   }
@@ -413,13 +436,14 @@ POST /v1/config/snowflake
 
 | Parameter        | Type    | Required | Default | Description                                    |
 |------------------|---------|----------|---------|------------------------------------------------|
-| `key`            | string  | Yes      | -       | Unique identifier for this configuration       |
+| `key`            | string  | Yes      | -       | Unique identifier for this configuration (cannot start/end with `__`) |
 | `name`           | string  | No       | -       | Human-readable name for the configuration      |
 | `skip_size`      | integer | No       | 1       | Number of leading bits to skip (sign bit)      |
 | `base_ts`        | integer | Yes      | -       | Base timestamp (epoch) in milliseconds         |
 | `ts_size`        | integer | Yes      | -       | Bit width for timestamp portion                |
 | `worker_id_size` | integer | Yes      | -       | Bit width for worker ID portion                |
 | `seq_size`       | integer | Yes      | -       | Bit width for sequence number portion          |
+| `key_token_enable`| boolean | No       | false   | If true, requires per-key token (rejects global token) |
 
 **Request Example:**
 
@@ -434,7 +458,8 @@ curl -X POST "http://idbuilder/v1/config/snowflake" \
     "base_ts": 1673606841000,
     "ts_size": 41,
     "worker_id_size": 10,
-    "seq_size": 12
+    "seq_size": 12,
+    "key_token_enable": false
   }'
 ```
 
@@ -481,6 +506,7 @@ curl -X GET "http://idbuilder/v1/config/snowflake?key=user-id" \
     "worker_id_size": 10,
     "seq_size": 12,
     "active_workers": 5,
+    "key_token_enable": false,
     "created_at": "2023-01-11T10:00:00Z",
     "updated_at": "2023-01-11T15:30:00Z"
   }
@@ -572,11 +598,12 @@ POST /v1/config/formatted
 
 **Request Body Parameters:**
 
-| Parameter | Type   | Required | Description                                       |
-|-----------|--------|----------|---------------------------------------------------|
-| `key`     | string | Yes      | Unique identifier for this configuration          |
-| `name`    | string | No       | Human-readable name for the configuration         |
-| `parts`   | array  | Yes      | Ordered list of part configurations               |
+| Parameter | Type   | Required | Default | Description                                       |
+|-----------|--------|----------|---------|---------------------------------------------------|
+| `key`     | string | Yes      | -       | Unique identifier for this configuration (cannot start/end with `__`) |
+| `name`    | string | No       | -       | Human-readable name for the configuration         |
+| `parts`   | array  | Yes      | -       | Ordered list of part configurations               |
+| `key_token_enable` | boolean | No | false | If true, requires per-key token (rejects global token) |
 
 **Request Example:**
 
@@ -599,7 +626,8 @@ curl -X POST "http://idbuilder/v1/config/formatted" \
         "padding_char": "0",
         "reset_scope": "date"
       }
-    ]
+    ],
+    "key_token_enable": false
   }'
 ```
 
@@ -654,6 +682,7 @@ curl -X GET "http://idbuilder/v1/config/formatted?key=invoice-id" \
       }
     ],
     "sample_id": "INV20230111-0001",
+    "key_token_enable": false,
     "created_at": "2023-01-11T10:00:00Z",
     "updated_at": "2023-01-11T15:30:00Z"
   }
